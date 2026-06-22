@@ -141,13 +141,17 @@ exit /b 0
 
 REM ========================================================
 REM Subroutine: patch Windows bat startup script
-REM openTCS 7.x bat format:
+REM
+REM openTCS 7.x bat classpath format:
 REM   set OPENTCS_CP=%OPENTCS_LIBDIR%\*;
-REM   set OPENTCS_CP=%OPENTCS_CP%;...
-REM We MODIFY the first line to prepend overlay BEFORE the lib dir:
+REM   set OPENTCS_CP=%OPENTCS_CP%;...more...;
+REM
+REM Correct patch (overlay AND lib on same line, overlay first):
 REM   set OPENTCS_CP=%OPENTCS_BASE%\i18n-overlay;%OPENTCS_LIBDIR%\*;
-REM (can't insert a new line because the next "set OPENTCS_CP="
-REM  without %OPENTCS_CP% reference would overwrite it)
+REM
+REM BAD old patch (separate line — gets overwritten):
+REM   set OPENTCS_CP=%OPENTCS_BASE%\i18n-overlay;
+REM   set OPENTCS_CP=%OPENTCS_LIBDIR%\*;     ← overwrites overlay!
 REM ========================================================
 :patch_bat
 set "script=%~1"
@@ -155,13 +159,59 @@ set "name=%~nx1"
 
 if not exist "!script!" exit /b
 
-findstr /c:"i18n-overlay" "!script!" >nul 2>&1
+REM Check for CORRECT existing patch
+findstr /c:"%%OPENTCS_BASE%%\i18n-overlay;%%OPENTCS_LIBDIR%%" "!script!" >nul 2>&1
 if !errorlevel! equ 0 (
     echo     !name! - already patched, skipping
     exit /b
 )
 
-REM Modify the first "set OPENTCS_CP=" line to prepend overlay
+REM Check for BAD old patch (separate i18n-overlay line, no LIBDIR)
+findstr /c:"i18n-overlay;" "!script!" >nul 2>&1
+if !errorlevel! equ 0 (
+    echo     !name! - fixing old broken patch...
+    REM Remove the bad separate overlay line, merge into first OPENTCS_CP
+    set "tmpfile=!script!.tmp"
+    set "done=0"
+    (
+        for /f "usebackq delims=" %%L in ("!script!") do (
+            set "line=%%L"
+            REM Skip the bad line: "set OPENTCS_CP=...i18n-overlay;" without LIBDIR
+            echo !line! | findstr /c:"i18n-overlay;" >nul
+            if !errorlevel! equ 0 (
+                echo !line! | findstr /c:"%%OPENTCS_LIBDIR%%" >nul
+                if !errorlevel! neq 0 (
+                    REM This is the bad overlay-only line — skip it
+                    set "line="
+                )
+            )
+            if defined line (
+                if "!done!"=="0" (
+                    echo !line! | findstr /c:"set OPENTCS_CP=" >nul
+                    if !errorlevel! equ 0 (
+                        echo !line! | findstr /c:"%%OPENTCS_LIBDIR%%" >nul
+                        if !errorlevel! equ 0 (
+                            REM First OPENTCS_CP+LIBDIR line — prepend overlay
+                            echo set OPENTCS_CP=%%OPENTCS_BASE%%\i18n-overlay;%%OPENTCS_LIBDIR%%\*;
+                            set "done=1"
+                        ) else (
+                            echo !line!
+                        )
+                    ) else (
+                        echo !line!
+                    )
+                ) else (
+                    echo !line!
+                )
+            )
+        )
+    ) > "!tmpfile!"
+    move /y "!tmpfile!" "!script!" >nul
+    echo     !name! - fixed
+    exit /b
+)
+
+REM Fresh patch: modify the first "set OPENTCS_CP=" line
 findstr /c:"set OPENTCS_CP=" "!script!" >nul 2>&1
 if !errorlevel! equ 0 (
     set "tmpfile=!script!.tmp"
@@ -172,8 +222,6 @@ if !errorlevel! equ 0 (
             if "!done!"=="0" (
                 echo !line! | findstr /c:"set OPENTCS_CP=" >nul
                 if !errorlevel! equ 0 (
-                    REM Replace the first OPENTCS_CP line: prepend overlay path
-                    REM Output literal: set OPENTCS_CP=%OPENTCS_BASE%\i18n-overlay;%OPENTCS_LIBDIR%\*;
                     echo set OPENTCS_CP=%%OPENTCS_BASE%%\i18n-overlay;%%OPENTCS_LIBDIR%%\*;
                     set "done=1"
                 ) else (

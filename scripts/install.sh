@@ -109,16 +109,28 @@ patch_script() {
     if ! echo "$name" | grep -qE '^(start|run)'; then
         return
     fi
-    if grep -q 'i18n-overlay' "$script" 2>/dev/null; then
+    # Check for CORRECT existing patch (overlay+LIBDIR on same line)
+    if grep -q 'OPENTCS_BASE.*i18n-overlay.*OPENTCS_LIBDIR' "$script" 2>/dev/null; then
         info "    $name — 已打过补丁，跳过"
+        return
+    fi
+
+    # Check for BAD old patch (separate overlay-only line)
+    if grep -q 'i18n-overlay' "$script" 2>/dev/null; then
+        warn "    $name — 修复旧版损坏补丁..."
+        # Remove the bad standalone overlay line, merge into first OPENTCS_CP+LIBDIR
+        sed -i '/set OPENTCS_CP=.*i18n-overlay;/{ /OPENTCS_LIBDIR/!d; }' "$script"
+        sed -i '0,/set OPENTCS_CP=%OPENTCS_LIBDIR%/{
+            s|set OPENTCS_CP=%OPENTCS_LIBDIR%|set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;%OPENTCS_LIBDIR%|
+        }' "$script"
+        info "    $name ✓ (已修复)"
         return
     fi
 
     local patched=false
 
-    # 策略1: OPENTCS_CP 变量 (openTCS 7.x 标准格式)
-    #   不能插入新行，因为下一个 "set OPENTCS_CP=" 不引用 %OPENTCS_CP% 会覆盖
-    #   直接修改第一行：%OPENTCS_LIBDIR%\* → %OPENTCS_BASE%/i18n-overlay;%OPENTCS_LIBDIR%\*
+    # Fresh patch: OPENTCS_CP 变量 (openTCS 7.x 标准格式)
+    #   不能插入新行，直接修改第一行注入 overlay
     if grep -q 'OPENTCS_CP=' "$script" 2>/dev/null; then
         sed -i '0,/set OPENTCS_CP=%OPENTCS_LIBDIR%/{
             s|set OPENTCS_CP=%OPENTCS_LIBDIR%|set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;%OPENTCS_LIBDIR%|
