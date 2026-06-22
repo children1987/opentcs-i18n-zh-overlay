@@ -1,9 +1,29 @@
 #!/usr/bin/env bash
 # install.sh — openTCS 中文语言包安装脚本
-# 用法: ./install.sh <opentcs安装目录>
+# 用法: ./install.sh <opentcs-7.3.0-bin目录>
 #
-# 原理：将 i18n-overlay/ 目录加入 classpath 最前面，
-# Java ResourceBundle 会优先加载 overlay 中的 _zh.properties 文件。
+# openTCS 7.x binary 结构（每个应用独立子目录）：
+#   opentcs-7.3.0-bin/
+#   ├── opentcs-kernel/
+#   │   ├── bin/startKernel
+#   │   ├── lib/*.jar
+#   │   └── config/
+#   ├── opentcs-kernelcontrolcenter/
+#   │   ├── bin/startKernelControlCenter
+#   │   ├── lib/*.jar
+#   │   └── config/
+#   ├── opentcs-modeleditor/
+#   │   ├── bin/startModelEditor
+#   │   ├── lib/*.jar
+#   │   └── config/
+#   └── opentcs-operationsdesk/
+#       ├── bin/startOperationsDesk
+#       ├── lib/*.jar
+#       └── config/
+#
+# 原理：将 i18n-overlay/ 复制到每个应用的目录下，
+# 并在 classpath 最前面注入该路径，Java ResourceBundle
+# 优先加载 overlay 中的 _zh.properties。
 set -euo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -13,166 +33,182 @@ error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 
 # ─── 参数检查 ─────────────────────────────────────────
 if [ $# -ne 1 ]; then
-    echo "用法: $0 <opentcs-安装目录>"
-    echo "示例: $0 /opt/opentcs-7.3.0"
+    echo "用法: $0 <opentcs-7.3.0-bin目录>"
+    echo "示例: $0 /opt/opentcs-7.3.0-bin"
     exit 1
 fi
 
-OTCS_DIR="$(realpath "$1")"
-if [ ! -d "$OTCS_DIR" ]; then
-    error "目录不存在: $OTCS_DIR"
+OTCS_ROOT="$(realpath "$1")"
+if [ ! -d "$OTCS_ROOT" ]; then
+    error "目录不存在: $OTCS_ROOT"
     exit 1
 fi
 
-# ─── 查找本脚本所在的项目根目录 ─────────────────────────
+# ─── 项目路径 ─────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 OVERLAY_SRC="$PROJECT_ROOT/i18n-overlay"
 
 if [ ! -d "$OVERLAY_SRC" ]; then
     error "找不到 i18n-overlay/ 目录"
-    error "请确认你在项目根目录的 scripts/ 中运行此脚本"
+    error "请在项目根目录的 scripts/ 中运行此脚本"
     exit 1
 fi
 
-# 检查 openTCS 目录结构
-HAS_BIN=false; HAS_LIB=false; HAS_CONFIG=false
-[ -d "$OTCS_DIR/bin" ] && HAS_BIN=true
-[ -d "$OTCS_DIR/lib" ] && HAS_LIB=true
-[ -d "$OTCS_DIR/config" ] && HAS_CONFIG=true
+# ─── 检测 openTCS 子应用 ──────────────────────────────
+# 子应用目录 → locale 配置 key 的映射
+declare -A APP_KEYS=(
+    ["opentcs-kernelcontrolcenter"]="kernelcontrolcenter"
+    ["opentcs-modeleditor"]="modeleditor"
+    ["opentcs-operationsdesk"]="operationsdesk"
+)
+# kernel 不需要 UI locale，但仍需 overlay（共享 i18n 资源可能被其他模块引用）
+ALL_APPS=("opentcs-kernel" "opentcs-kernelcontrolcenter" "opentcs-modeleditor" "opentcs-operationsdesk")
 
-if ! $HAS_BIN && ! $HAS_LIB; then
-    error "$OTCS_DIR 不像是 openTCS 安装目录（缺少 bin/ 或 lib/）"
-    error "请确认解压后的 openTCS 目录结构正确"
+FOUND_APPS=()
+for app in "${ALL_APPS[@]}"; do
+    if [ -d "$OTCS_ROOT/$app" ]; then
+        FOUND_APPS+=("$app")
+    fi
+done
+
+if [ ${#FOUND_APPS[@]} -eq 0 ]; then
+    error "未找到任何 openTCS 子应用目录"
+    error "请确认 $OTCS_ROOT 是解压后的 openTCS-7.3.0-bin 目录"
     exit 1
 fi
+
+info "检测到 ${#FOUND_APPS[@]} 个子应用: ${FOUND_APPS[*]}"
 
 # ─── Step 1: 备份 ──────────────────────────────────────
-BACKUP_DIR="$OTCS_DIR/.i18n-zh-backup-$(date +%Y%m%d_%H%M%S)"
+BACKUP_DIR="$OTCS_ROOT/.i18n-zh-backup-$(date +%Y%m%d_%H%M%S)"
 info "创建备份: $BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
 
-# 备份启动脚本
-if $HAS_BIN; then
-    for f in "$OTCS_DIR/bin/"*; do
-        [ -f "$f" ] && cp "$f" "$BACKUP_DIR/"
-    done
-fi
-
-# 备份配置文件
-if $HAS_CONFIG; then
-    cp -r "$OTCS_DIR/config" "$BACKUP_DIR/" 2>/dev/null || true
-fi
+for app in "${FOUND_APPS[@]}"; do
+    app_dir="$OTCS_ROOT/$app"
+    # 备份启动脚本
+    if [ -d "$app_dir/bin" ]; then
+        mkdir -p "$BACKUP_DIR/$app/bin"
+        cp -a "$app_dir/bin/"* "$BACKUP_DIR/$app/bin/" 2>/dev/null || true
+    fi
+    # 备份配置
+    if [ -d "$app_dir/config" ]; then
+        mkdir -p "$BACKUP_DIR/$app"
+        cp -r "$app_dir/config" "$BACKUP_DIR/$app/" 2>/dev/null || true
+    fi
+done
 info "备份完成 ($BACKUP_DIR)"
 
-# ─── Step 2: 复制翻译文件 ──────────────────────────────
-OVERLAY_DST="$OTCS_DIR/i18n-overlay"
-info "复制中文翻译文件..."
-if [ -d "$OVERLAY_DST" ]; then
-    warn "目标已存在 i18n-overlay/，将被覆盖"
-    rm -rf "$OVERLAY_DST"
-fi
-cp -r "$OVERLAY_SRC" "$OVERLAY_DST"
-FILE_COUNT=$(find "$OVERLAY_DST" -type f | wc -l)
-info "已复制 $FILE_COUNT 个文件到 $OVERLAY_DST"
+# ─── Step 2: 复制 overlay 到每个子应用 ──────────────────
+info "复制中文翻译文件到各子应用..."
+for app in "${FOUND_APPS[@]}"; do
+    app_dir="$OTCS_ROOT/$app"
+    overlay_dst="$app_dir/i18n-overlay"
 
-# ─── Step 3: 补丁启动脚本 —— classpath 注入 ────────────
-if $HAS_BIN; then
-    info "修改启动脚本，注入 overlay classpath..."
+    if [ -d "$overlay_dst" ]; then
+        rm -rf "$overlay_dst"
+    fi
+    cp -r "$OVERLAY_SRC" "$overlay_dst"
+    file_count=$(find "$overlay_dst" -type f | wc -l)
+    info "  $app/ — $file_count 个文件"
+done
 
-    patch_script() {
-        local script="$1"
-        local name
-        name="$(basename "$script")"
+# ─── Step 3: Patch 各子应用的启动脚本 ───────────────────
+info "修改启动脚本，注入 overlay classpath..."
 
-        # 跳过非启动脚本和已经打过补丁的
-        if ! echo "$name" | grep -qE '^(start|run)'; then
-            return
-        fi
-        if grep -q 'i18n-overlay' "$script" 2>/dev/null; then
-            info "  $name — 已打过补丁，跳过"
-            return
-        fi
+patch_script() {
+    local script="$1"
+    local name
+    name="$(basename "$script")"
 
-        local patched=false
+    # 跳过非启动脚本
+    if ! echo "$name" | grep -qE '^(start|run)'; then
+        return
+    fi
+    if grep -q 'i18n-overlay' "$script" 2>/dev/null; then
+        info "    $name — 已打过补丁，跳过"
+        return
+    fi
 
-        # 策略1: OPENTCS_CP + OPENTCS_LIBDIR 变量拼接 (openTCS 4.x/5.x 风格)
-        #   export OPENTCS_CP="${OPENTCS_LIBDIR}/*"
-        #   → 改为在前面加 overlay
-        if grep -q 'OPENTCS_CP=' "$script" 2>/dev/null; then
-            if grep -q 'OPENTCS_CP=.*OPENTCS_LIBDIR' "$script" 2>/dev/null; then
-                # 在第一个 OPENTCS_CP 定义行前插入 overlay
-                sed -i '/^export OPENTCS_CP=.*OPENTCS_LIBDIR/{
-                    i\export OPENTCS_CP="${OPENTCS_BASE}/i18n-overlay"
-                }' "$script"
-                patched=true
-            fi
-        fi
+    local patched=false
 
-        # 策略2: Gradle Application Plugin 风格 (7.x)
-        #   CLASSPATH=$APP_HOME/lib/xxx.jar:$APP_HOME/lib/yyy.jar
-        if ! $patched && grep -q '^CLASSPATH=' "$script" 2>/dev/null; then
-            sed -i 's|^CLASSPATH="\?\(.*\)|CLASSPATH="$APP_HOME/i18n-overlay:\1|' "$script"
+    # 策略1: OPENTCS_CP + OPENTCS_LIBDIR 变量拼接 (openTCS 5.x 及更早)
+    if grep -q 'OPENTCS_CP=' "$script" 2>/dev/null; then
+        sed -i '/^export OPENTCS_CP=.*OPENTCS_LIBDIR/{
+            i\export OPENTCS_CP="${OPENTCS_BASE}/i18n-overlay"
+        }' "$script"
+        patched=true
+    fi
+
+    # 策略2: CLASSPATH= 变量定义 (Gradle Application Plugin)
+    if ! $patched && grep -q '^CLASSPATH=' "$script" 2>/dev/null; then
+        sed -i 's|^CLASSPATH="\?|CLASSPATH="$APP_HOME/i18n-overlay:|' "$script"
+        patched=true
+    fi
+
+    # 策略3: 在 java/eval 执行行前注入
+    if ! $patched; then
+        if grep -qE '(^\s*\$JAVA|^\s*eval|\-classpath|\-cp)' "$script" 2>/dev/null; then
+            sed -i '/^[^#]*\(exec\|eval\|\$JAVA\|\$JAVACMD\)/{
+                i\# === openTCS i18n-zh overlay ===
+                i\CLASSPATH="$APP_HOME/i18n-overlay${CLASSPATH:+:$CLASSPATH}"
+                i\export CLASSPATH
+            }' "$script"
             patched=true
         fi
+    fi
 
-        # 策略3: 直接在 java/eval 行前插入 CLASSPATH
-        if ! $patched; then
-            # 在 java 命令或 eval 命令前插入 export
-            if grep -qE '(^\s*\$JAVA|^\s*eval|\-classpath|\-cp)' "$script" 2>/dev/null; then
-                # 在第一个 exec/eval/java 行前插入
-                sed -i '/^[^#]*\(exec\|eval\|\$JAVA\|\$JAVACMD\)/{
-                    i\# === openTCS i18n-zh overlay ===
-                    i\CLASSPATH="$APP_HOME/i18n-overlay${CLASSPATH:+:$CLASSPATH}"
-                    i\export CLASSPATH
-                }' "$script"
-                patched=true
-            fi
-        fi
+    if $patched; then
+        info "    $name ✓"
+    else
+        warn "    $name — 无法识别脚本格式，请手动将 i18n-overlay/ 加入 classpath"
+    fi
+}
 
-        if $patched; then
-            info "  $name ✓"
-        else
-            warn "  $name — 无法识别脚本格式，请手动将 i18n-overlay/ 加入 classpath"
-        fi
-    }
-
-    for script in "$OTCS_DIR/bin/"*; do
+for app in "${FOUND_APPS[@]}"; do
+    bin_dir="$OTCS_ROOT/$app/bin"
+    if [ ! -d "$bin_dir" ]; then
+        continue
+    fi
+    info "  $app/bin/"
+    for script in "$bin_dir/"*; do
         [ -f "$script" ] && patch_script "$script"
     done
-fi
+done
 
 # ─── Step 4: 配置 locale=zh ────────────────────────────
-if $HAS_CONFIG; then
-    info "配置语言为中文..."
+info "配置语言为中文..."
 
-    declare -A LOCALE_KEYS=(
-        ["opentcs-kernelcontrolcenter"]="kernelcontrolcenter"
-        ["opentcs-modeleditor"]="modeleditor"
-        ["opentcs-operationsdesk"]="operationsdesk"
-    )
+for app in "${FOUND_APPS[@]}"; do
+    key="${APP_KEYS[$app]:-}"
+    if [ -z "$key" ]; then
+        # kernel 不需要 locale 配置
+        continue
+    fi
 
-    for prefix in "${!LOCALE_KEYS[@]}"; do
-        key="${LOCALE_KEYS[$prefix]}"
-        config_file="$OTCS_DIR/config/${prefix}.properties"
-        defaults_file="$OTCS_DIR/config/${prefix}-defaults-custom.properties"
+    config_dir="$OTCS_ROOT/$app/config"
+    if [ ! -d "$config_dir" ]; then
+        warn "  $app — config/ 目录不存在，跳过"
+        continue
+    fi
 
-        # 优先在 custom 文件设置
-        for cf in "$defaults_file" "$config_file"; do
-            if [ -f "$cf" ]; then
-                if grep -q "^${key}\.locale=" "$cf" 2>/dev/null; then
-                    sed -i "s/^${key}\.locale=.*/${key}.locale=zh/" "$cf"
-                else
-                    echo "${key}.locale=zh" >> "$cf"
-                fi
-                info "  $(basename "$cf") → ${key}.locale=zh"
-                break
+    # 优先在 -defaults-custom.properties 中设置，其次在 .properties
+    defaults_custom="$config_dir/${app}-defaults-custom.properties"
+    app_props="$config_dir/${app}.properties"
+
+    for cf in "$defaults_custom" "$app_props"; do
+        if [ -f "$cf" ]; then
+            if grep -q "^${key}\.locale=" "$cf" 2>/dev/null; then
+                sed -i "s/^${key}\.locale=.*/${key}.locale=zh/" "$cf"
+            else
+                echo "${key}.locale=zh" >> "$cf"
             fi
-        done
+            info "  $(basename "$cf") → ${key}.locale=zh"
+            break
+        fi
     done
-else
-    warn "config/ 目录不存在，请手动设置各应用 locale=zh"
-fi
+done
 
 # ─── 完成 ──────────────────────────────────────────────
 echo ""
@@ -181,13 +217,14 @@ echo "  openTCS 中文语言包安装完成！"
 echo "═══════════════════════════════════════════"
 echo ""
 echo "启动方式（与官方完全相同）："
-[ -f "$OTCS_DIR/bin/startKernel" ]            && echo "  $OTCS_DIR/bin/startKernel"
-[ -f "$OTCS_DIR/bin/startKernel.sh" ]         && echo "  $OTCS_DIR/bin/startKernel.sh"
-[ -f "$OTCS_DIR/bin/startKernelControlCenter" ]    && echo "  $OTCS_DIR/bin/startKernelControlCenter"
-[ -f "$OTCS_DIR/bin/startKernelControlCenter.sh" ] && echo "  $OTCS_DIR/bin/startKernelControlCenter.sh"
-[ -f "$OTCS_DIR/bin/startModelEditor" ]       && echo "  $OTCS_DIR/bin/startModelEditor"
-[ -f "$OTCS_DIR/bin/startModelEditor.sh" ]    && echo "  $OTCS_DIR/bin/startModelEditor.sh"
-[ -f "$OTCS_DIR/bin/startOperationsDesk" ]    && echo "  $OTCS_DIR/bin/startOperationsDesk"
-[ -f "$OTCS_DIR/bin/startOperationsDesk.sh" ] && echo "  $OTCS_DIR/bin/startOperationsDesk.sh"
+for app in "${FOUND_APPS[@]}"; do
+    bin_dir="$OTCS_ROOT/$app/bin"
+    if [ -d "$bin_dir" ]; then
+        for s in "$bin_dir"/start*; do
+            [ -f "$s" ] && echo "  $s"
+        done
+    fi
+done
 echo ""
-echo "如需恢复原始状态，备份在: $BACKUP_DIR"
+echo "如需恢复，运行: $PROJECT_ROOT/scripts/uninstall.sh $OTCS_ROOT"
+echo "备份位于: $BACKUP_DIR"

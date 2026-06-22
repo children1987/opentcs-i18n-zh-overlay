@@ -27,16 +27,16 @@ openTCS 使用 Java 标准 `ResourceBundle` 进行国际化。`ResourceBundle.ge
 
 ```bash
 # 克隆本项目
-git clone https://github.com/children1987/opentcs-i18n-zh.git
-cd opentcs-i18n-zh
+git clone https://github.com/children1987/opentcs-i18n-zh-overlay.git
+cd opentcs-i18n-zh-overlay
 
 # 运行安装脚本
-./scripts/install.sh /path/to/opentcs-7.3.0
+./scripts/install.sh /path/to/opentcs-7.3.0-bin
 ```
 
 安装脚本会自动：
-- 将 `i18n-overlay/` 复制到 openTCS 目录
-- 修改所有启动脚本（`startKernel.sh`、`startModelEditor.sh` 等），在最前面注入 classpath
+- 将 `i18n-overlay/` 复制到每个应用的目录下（kernel、kernelcontrolcenter、modeleditor、operationsdesk）
+- 修改各应用的启动脚本，在最前面注入 classpath
 - 设置各应用配置文件的 `locale=zh`
 
 ### 3. 启动
@@ -44,11 +44,11 @@ cd opentcs-i18n-zh
 照常使用官方启动脚本，界面即为中文：
 
 ```bash
-cd /path/to/opentcs-7.3.0/bin
-./startKernel.sh
-./startKernelControlCenter.sh
-./startModelEditor.sh
-./startOperationsDesk.sh
+# openTCS 7.x 每个应用有独立子目录
+/path/to/opentcs-7.3.0-bin/opentcs-kernel/bin/startKernel
+/path/to/opentcs-7.3.0-bin/opentcs-kernelcontrolcenter/bin/startKernelControlCenter
+/path/to/opentcs-7.3.0-bin/opentcs-modeleditor/bin/startModelEditor
+/path/to/opentcs-7.3.0-bin/opentcs-operationsdesk/bin/startOperationsDesk
 ```
 
 ## 覆盖的应用模块
