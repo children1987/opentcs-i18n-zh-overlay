@@ -19,6 +19,7 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
       - name: Create release tarball
+        id: archive
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           ARCHIVE="opentcs-i18n-zh-overlay-${VERSION}.tar.gz"
@@ -42,6 +43,6 @@ jobs:
             - 44 个中文翻译文件（CC BY 4.0）
             - 一键安装/卸载脚本
             - ~22KB，无需编译，无依赖
-          files: "${{ steps.version.outputs.ARCHIVE }}"
+          files: "${{ steps.archive.outputs.ARCHIVE }}"
           draft: false
           prerelease: false
