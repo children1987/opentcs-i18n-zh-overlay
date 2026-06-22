@@ -35,10 +35,12 @@ for %%A in (%APPS%) do (
     set "app_dir=!OTCS_ROOT!\%%A"
     if exist "!app_dir!\" (
 
-        REM Restore startup scripts
-        if exist "!BACKUP_DIR!\%%A\bin\" (
-            xcopy /e /q /y "!BACKUP_DIR!\%%A\bin\*" "!app_dir!\bin\" >nul 2>&1
-            echo [INFO] Restored: %%A\bin\
+        REM Restore startup scripts at sub-app root
+        for %%F in ("!BACKUP_DIR!\%%A\start*.bat" "!BACKUP_DIR!\%%A\start*.sh") do (
+            if exist %%F (
+                copy /y %%F "!app_dir!\" >nul 2>&1
+                echo [INFO] Restored: %%A\%%~nxF
+            )
         )
 
         REM Restore config

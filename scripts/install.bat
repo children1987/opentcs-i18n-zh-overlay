@@ -2,6 +2,22 @@
 chcp 65001 >nul 2>&1
 REM install.bat - openTCS Chinese language pack installer (Windows)
 REM Usage: install.bat <opentcs-7.3.0-bin-dir>
+REM
+REM openTCS 7.x structure (startup scripts at sub-app root, not bin\):
+REM   opentcs-7.3.0-bin\
+REM   +-- opentcs-kernel\
+REM   |   +-- startKernel.bat
+REM   |   +-- startKernel.sh
+REM   |   +-- lib\  config\  bin\(splash only)
+REM   +-- opentcs-kernelcontrolcenter\
+REM   |   +-- startKernelControlCenter.bat
+REM   |   +-- lib\  config\  bin\
+REM   +-- opentcs-modeleditor\
+REM   |   +-- startModelEditor.bat
+REM   |   +-- lib\  config\  bin\
+REM   +-- opentcs-operationsdesk\
+REM       +-- startOperationsDesk.bat
+REM       +-- lib\  config\  bin\
 setlocal enabledelayedexpansion
 
 if "%~1"=="" (
@@ -51,13 +67,16 @@ echo [INFO] Creating backup: !BACKUP_DIR!
 mkdir "!BACKUP_DIR!" 2>nul
 
 for %%A in (!FOUND!) do (
-    if exist "!OTCS_ROOT!\%%A\bin\" (
-        mkdir "!BACKUP_DIR!\%%A\bin" 2>nul
-        xcopy /q /y "!OTCS_ROOT!\%%A\bin\*" "!BACKUP_DIR!\%%A\bin\" >nul 2>&1
+    set "APP_DIR=!OTCS_ROOT!\%%A"
+    mkdir "!BACKUP_DIR!\%%A" 2>nul
+    REM backup startup scripts at sub-app root
+    for %%F in ("!APP_DIR!\start*.bat" "!APP_DIR!\start*.sh") do (
+        if exist %%F copy /y %%F "!BACKUP_DIR!\%%A\" >nul 2>&1
     )
-    if exist "!OTCS_ROOT!\%%A\config\" (
+    REM backup config
+    if exist "!APP_DIR!\config\" (
         mkdir "!BACKUP_DIR!\%%A\config" 2>nul
-        xcopy /e /q /y "!OTCS_ROOT!\%%A\config\*" "!BACKUP_DIR!\%%A\config\" >nul 2>&1
+        xcopy /e /q /y "!APP_DIR!\config\*" "!BACKUP_DIR!\%%A\config\" >nul 2>&1
     )
 )
 echo [INFO] Backup complete
@@ -75,15 +94,18 @@ REM ==== Step 3: Patch startup scripts =====================
 echo [INFO] Patching startup scripts...
 
 for %%A in (!FOUND!) do (
-    set "BIN_DIR=!OTCS_ROOT!\%%A\bin"
-    if exist "!BIN_DIR!\" (
-        echo   %%A\bin\
-        for %%F in ("!BIN_DIR!\start*.bat") do (
-            call :patch_bat "%%F"
-        )
-        for %%F in ("!BIN_DIR!\start*.cmd") do (
-            call :patch_bat "%%F"
-        )
+    set "APP_DIR=!OTCS_ROOT!\%%A"
+    echo   %%A\
+    REM Scripts are at sub-app root, not in bin\
+    for %%F in ("!APP_DIR!\start*.bat") do (
+        call :patch_bat "%%F"
+    )
+    for %%F in ("!APP_DIR!\start*.cmd") do (
+        call :patch_bat "%%F"
+    )
+    REM Also patch .sh scripts for WSL / Git Bash users
+    for %%F in ("!APP_DIR!\start*.sh") do (
+        call :patch_sh "%%F"
     )
 )
 
@@ -107,34 +129,37 @@ echo ===========================================
 echo.
 echo Start as usual:
 for %%A in (!FOUND!) do (
-    for %%F in ("!OTCS_ROOT!\%%A\bin\start*.bat") do (
+    for %%F in ("!OTCS_ROOT!\%%A\start*.bat") do (
         echo   %%F
     )
 )
 echo.
-echo To uninstall, run: !PROJECT_ROOT!\scripts\uninstall.bat !OTCS_ROOT!
+echo To uninstall: !PROJECT_ROOT!\scripts\uninstall.bat !OTCS_ROOT!
 echo Backup saved to: !BACKUP_DIR!
 exit /b 0
 
 
 REM ========================================================
-REM Subroutine: patch a Windows bat startup script
+REM Subroutine: patch Windows bat startup script
+REM openTCS 7.x bat format:
+REM   set OPENTCS_CP=%OPENTCS_LIBDIR%\*;
+REM   set OPENTCS_CP=%OPENTCS_CP%;...
+REM We prepend: set OPENTCS_CP=%OPENTCS_BASE%\i18n-overlay;
 REM ========================================================
 :patch_bat
 set "script=%~1"
 set "name=%~nx1"
 
-REM Skip if already patched
+if not exist "!script!" exit /b
+
 findstr /c:"i18n-overlay" "!script!" >nul 2>&1
 if !errorlevel! equ 0 (
     echo     !name! - already patched, skipping
     exit /b
 )
 
-if not exist "!script!" exit /b
-
-REM Strategy 1: set CLASSPATH= definition (Gradle Application Plugin)
-findstr /c:"set CLASSPATH=" "!script!" >nul 2>&1
+REM Look for first "set OPENTCS_CP=" line and prepend our overlay
+findstr /c:"set OPENTCS_CP=" "!script!" >nul 2>&1
 if !errorlevel! equ 0 (
     set "tmpfile=!script!.tmp"
     set "inserted=0"
@@ -142,10 +167,10 @@ if !errorlevel! equ 0 (
         for /f "usebackq delims=" %%L in ("!script!") do (
             set "line=%%L"
             if "!inserted!"=="0" (
-                echo !line! | findstr /c:"set CLASSPATH=" >nul
+                echo !line! | findstr /c:"set OPENTCS_CP=" >nul
                 if !errorlevel! equ 0 (
                     echo REM === openTCS i18n-zh overlay ===
-                    echo set CLASSPATH=%%APP_HOME%%\i18n-overlay;%%CLASSPATH%%
+                    echo set OPENTCS_CP=%%OPENTCS_BASE%%\i18n-overlay;
                     set "inserted=1"
                 )
             )
@@ -157,8 +182,8 @@ if !errorlevel! equ 0 (
     exit /b
 )
 
-REM Strategy 2: look for CLASSPATH or java command
-findstr /i /c:"classpath" /c:"java" "!script!" >nul 2>&1
+REM Fallback: look for CLASSPATH or classpath references
+findstr /i /c:"classpath" /c:"OPENTCS_CP" "!script!" >nul 2>&1
 if !errorlevel! equ 0 (
     set "tmpfile=!script!.tmp"
     set "inserted=0"
@@ -166,10 +191,10 @@ if !errorlevel! equ 0 (
         for /f "usebackq delims=" %%L in ("!script!") do (
             set "line=%%L"
             if "!inserted!"=="0" (
-                echo !line! | findstr /i /c:"classpath" >nul
+                echo !line! | findstr /i /c:"OPENTCS_CP" /c:"classpath" >nul
                 if !errorlevel! equ 0 (
                     echo REM === openTCS i18n-zh overlay ===
-                    echo set CLASSPATH=%%APP_HOME%%\i18n-overlay;%%CLASSPATH%%
+                    echo set OPENTCS_CP=%%OPENTCS_BASE%%\i18n-overlay;%%OPENTCS_CP%%
                     set "inserted=1"
                 )
             )
@@ -182,6 +207,37 @@ if !errorlevel! equ 0 (
 )
 
 echo     !name! - unknown format, please add i18n-overlay to classpath manually
+exit /b
+
+
+REM ========================================================
+REM Subroutine: patch shell startup script (for WSL/Git Bash)
+REM ========================================================
+:patch_sh
+set "script=%~1"
+set "name=%~nx1"
+
+if not exist "!script!" exit /b
+
+grep -q "i18n-overlay" "!script!" 2>nul
+if !errorlevel! equ 0 (
+    echo     !name! - already patched
+    exit /b
+)
+
+REM Check if sed is available (Git Bash / WSL)
+where sed >nul 2>&1
+if !errorlevel! neq 0 exit /b
+
+sed -i '/^set OPENTCS_CP=%OPENTCS_LIBDIR%/i\
+# === openTCS i18n-zh overlay ===\
+set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;\
+' "!script!" 2>nul
+if !errorlevel! equ 0 (
+    echo     !name! - patched
+) else (
+    echo     !name! - sed failed, skipping
+)
 exit /b
 
 

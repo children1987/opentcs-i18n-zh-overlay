@@ -31,15 +31,13 @@ for app in "${ALL_APPS[@]}"; do
     app_dir="$OTCS_ROOT/$app"
     [ -d "$app_dir" ] || continue
 
-    # 恢复启动脚本
-    if [ -d "$BACKUP/$app/bin" ]; then
-        for f in "$BACKUP/$app/bin/"*; do
-            [ -f "$f" ] || continue
-            base="$(basename "$f")"
-            cp "$f" "$app_dir/bin/$base"
-            info "恢复: $app/bin/$base"
-        done
-    fi
+    # 恢复启动脚本（在子应用根目录）
+    for f in "$BACKUP/$app"/start*; do
+        [ -f "$f" ] || continue
+        base="$(basename "$f")"
+        cp "$f" "$app_dir/$base"
+        info "恢复: $app/$base"
+    done
 
     # 恢复配置
     if [ -d "$BACKUP/$app/config" ] && [ -d "$app_dir/config" ]; then

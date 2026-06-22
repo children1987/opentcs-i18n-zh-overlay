@@ -2,24 +2,7 @@
 # install.sh — openTCS 中文语言包安装脚本
 # 用法: ./install.sh <opentcs-7.3.0-bin目录>
 #
-# openTCS 7.x binary 结构（每个应用独立子目录）：
-#   opentcs-7.3.0-bin/
-#   ├── opentcs-kernel/
-#   │   ├── bin/startKernel
-#   │   ├── lib/*.jar
-#   │   └── config/
-#   ├── opentcs-kernelcontrolcenter/
-#   │   ├── bin/startKernelControlCenter
-#   │   ├── lib/*.jar
-#   │   └── config/
-#   ├── opentcs-modeleditor/
-#   │   ├── bin/startModelEditor
-#   │   ├── lib/*.jar
-#   │   └── config/
-#   └── opentcs-operationsdesk/
-#       ├── bin/startOperationsDesk
-#       ├── lib/*.jar
-#       └── config/
+# openTCS 7.x binary 结构（每个应用独立子目录，启动脚本在子应用根目录）：\n#   opentcs-7.3.0-bin/\n#   ├── opentcs-kernel/\n#   │   ├── startKernel     ← 脚本在根目录，不在 bin/\n#   │   ├── bin/            ← 仅 splash 图片\n#   │   ├── lib/*.jar\n#   │   └── config/\n#   ├── opentcs-kernelcontrolcenter/\n#   │   ├── startKernelControlCenter\n#   │   ├── bin/  lib/  config/\n#   ├── opentcs-modeleditor/\n#   │   ├── startModelEditor\n#   │   ├── bin/  lib/  config/\n#   └── opentcs-operationsdesk/\n#       ├── startOperationsDesk\n#       ├── bin/  lib/  config/
 #
 # 原理：将 i18n-overlay/ 复制到每个应用的目录下，
 # 并在 classpath 最前面注入该路径，Java ResourceBundle
@@ -87,11 +70,11 @@ mkdir -p "$BACKUP_DIR"
 
 for app in "${FOUND_APPS[@]}"; do
     app_dir="$OTCS_ROOT/$app"
-    # 备份启动脚本
-    if [ -d "$app_dir/bin" ]; then
-        mkdir -p "$BACKUP_DIR/$app/bin"
-        cp -a "$app_dir/bin/"* "$BACKUP_DIR/$app/bin/" 2>/dev/null || true
-    fi
+    # 备份启动脚本（在子应用根目录，不在 bin/）
+    mkdir -p "$BACKUP_DIR/$app"
+    for s in "$app_dir"/start*; do
+        [ -f "$s" ] && cp -a "$s" "$BACKUP_DIR/$app/"
+    done
     # 备份配置
     if [ -d "$app_dir/config" ]; then
         mkdir -p "$BACKUP_DIR/$app"
@@ -133,30 +116,23 @@ patch_script() {
 
     local patched=false
 
-    # 策略1: OPENTCS_CP + OPENTCS_LIBDIR 变量拼接 (openTCS 5.x 及更早)
+    # 策略1: OPENTCS_CP 变量 (openTCS 7.x 标准格式)
+    #   原始: set OPENTCS_CP=%OPENTCS_LIBDIR%\*;
+    #   补丁: set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;
     if grep -q 'OPENTCS_CP=' "$script" 2>/dev/null; then
-        sed -i '/^export OPENTCS_CP=.*OPENTCS_LIBDIR/{
-            i\export OPENTCS_CP="${OPENTCS_BASE}/i18n-overlay"
+        sed -i '/^set OPENTCS_CP=%OPENTCS_LIBDIR%/{
+            i\# === openTCS i18n-zh overlay ===
+            i\set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;
         }' "$script"
         patched=true
     fi
 
-    # 策略2: CLASSPATH= 变量定义 (Gradle Application Plugin)
-    if ! $patched && grep -q '^CLASSPATH=' "$script" 2>/dev/null; then
-        sed -i 's|^CLASSPATH="\?|CLASSPATH="$APP_HOME/i18n-overlay:|' "$script"
+    # 策略2: export OPENTCS_CP (旧版 .sh 脚本)
+    if ! $patched && grep -q 'OPENTCS_CP=' "$script" 2>/dev/null; then
+        sed -i '/^set OPENTCS_CP=.*OPENTCS_LIBDIR/{
+            i\set OPENTCS_CP="${OPENTCS_BASE}/i18n-overlay;"
+        }' "$script"
         patched=true
-    fi
-
-    # 策略3: 在 java/eval 执行行前注入
-    if ! $patched; then
-        if grep -qE '(^\s*\$JAVA|^\s*eval|\-classpath|\-cp)' "$script" 2>/dev/null; then
-            sed -i '/^[^#]*\(exec\|eval\|\$JAVA\|\$JAVACMD\)/{
-                i\# === openTCS i18n-zh overlay ===
-                i\CLASSPATH="$APP_HOME/i18n-overlay${CLASSPATH:+:$CLASSPATH}"
-                i\export CLASSPATH
-            }' "$script"
-            patched=true
-        fi
     fi
 
     if $patched; then
@@ -167,13 +143,11 @@ patch_script() {
 }
 
 for app in "${FOUND_APPS[@]}"; do
-    bin_dir="$OTCS_ROOT/$app/bin"
-    if [ ! -d "$bin_dir" ]; then
-        continue
-    fi
-    info "  $app/bin/"
-    for script in "$bin_dir/"*; do
-        [ -f "$script" ] && patch_script "$script"
+    app_dir="$OTCS_ROOT/$app"
+    info "  $app/"
+    # 脚本在子应用根目录：startKernel, startOperationsDesk 等
+    for script in "$app_dir"/start*; do
+        [ -f "$script" ] && [ ! -L "$script" ] && patch_script "$script"
     done
 done
 
@@ -218,12 +192,10 @@ echo "════════════════════════�
 echo ""
 echo "启动方式（与官方完全相同）："
 for app in "${FOUND_APPS[@]}"; do
-    bin_dir="$OTCS_ROOT/$app/bin"
-    if [ -d "$bin_dir" ]; then
-        for s in "$bin_dir"/start*; do
-            [ -f "$s" ] && echo "  $s"
-        done
-    fi
+    app_dir="$OTCS_ROOT/$app"
+    for s in "$app_dir"/start*; do
+        [ -f "$s" ] && echo "  $s"
+    done
 done
 echo ""
 echo "如需恢复，运行: $PROJECT_ROOT/scripts/uninstall.sh $OTCS_ROOT"
