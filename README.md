@@ -19,37 +19,60 @@ openTCS 使用 Java 标准 `ResourceBundle` 进行国际化。`ResourceBundle.ge
 
 ## 快速开始
 
-### 1. 下载官方 openTCS
+### 方式一：下载 Release（推荐）
 
-从 [openTCS 官方下载页](https://www.opentcs.org/en/download.html) 下载 `opentcs-7.3.0-bin.zip` 并解压。
+从 [Releases](https://github.com/children1987/opentcs-i18n-zh-overlay/releases) 下载最新的 `opentcs-i18n-zh-overlay-7.3.0.tar.gz`，解压后运行安装脚本。
 
-### 2. 应用中文语言包
+### 方式二：git clone
 
 ```bash
-# 克隆本项目
 git clone https://github.com/children1987/opentcs-i18n-zh-overlay.git
 cd opentcs-i18n-zh-overlay
+```
 
-# 运行安装脚本
+### 安装
+
+**Linux / macOS：**
+
+```bash
 ./scripts/install.sh /path/to/opentcs-7.3.0-bin
+```
+
+**Windows（命令提示符或 PowerShell）：**
+
+```cmd
+scripts\install.bat C:\opentcs-7.3.0-bin
 ```
 
 安装脚本会自动：
 - 将 `i18n-overlay/` 复制到每个应用的目录下（kernel、kernelcontrolcenter、modeleditor、operationsdesk）
-- 修改各应用的启动脚本，在最前面注入 classpath
+- 修改各应用的启动脚本（`.sh` / `.bat`），在最前面注入 classpath
 - 设置各应用配置文件的 `locale=zh`
 
-### 3. 启动
+### 启动
 
 照常使用官方启动脚本，界面即为中文：
 
+**Linux / macOS：**
 ```bash
-# openTCS 7.x 每个应用有独立子目录
-/path/to/opentcs-7.3.0-bin/opentcs-kernel/bin/startKernel
-/path/to/opentcs-7.3.0-bin/opentcs-kernelcontrolcenter/bin/startKernelControlCenter
-/path/to/opentcs-7.3.0-bin/opentcs-modeleditor/bin/startModelEditor
-/path/to/opentcs-7.3.0-bin/opentcs-operationsdesk/bin/startOperationsDesk
+opentcs-7.3.0-bin/opentcs-kernel/bin/startKernel
+opentcs-7.3.0-bin/opentcs-kernelcontrolcenter/bin/startKernelControlCenter
+opentcs-7.3.0-bin/opentcs-modeleditor/bin/startModelEditor
+opentcs-7.3.0-bin/opentcs-operationsdesk/bin/startOperationsDesk
 ```
+
+**Windows：**
+```cmd
+opentcs-7.3.0-bin\opentcs-kernel\bin\startKernel.bat
+opentcs-7.3.0-bin\opentcs-kernelcontrolcenter\bin\startKernelControlCenter.bat
+opentcs-7.3.0-bin\opentcs-modeleditor\bin\startModelEditor.bat
+opentcs-7.3.0-bin\opentcs-operationsdesk\bin\startOperationsDesk.bat
+```
+
+### 卸载
+
+**Linux / macOS：** `./scripts/uninstall.sh <opentcs目录>`  
+**Windows：** `scripts\uninstall.bat <opentcs目录>`
 
 ## 覆盖的应用模块
 
