@@ -171,9 +171,10 @@ for app in "${FOUND_APPS[@]}"; do
     for cf in "$defaults_custom" "$app_props"; do
         if [ -f "$cf" ]; then
             if grep -q "^${key}\.locale=" "$cf" 2>/dev/null; then
-                sed -i "s/^${key}\.locale=.*/${key}.locale=zh/" "$cf"
+                # 替换已有行，同时清理尾随空白
+                sed -i "s/^${key}\.locale[[:space:]]*=.*/${key}.locale=zh/" "$cf"
             else
-                echo "${key}.locale=zh" >> "$cf"
+                printf '%s\n' "${key}.locale=zh" >> "$cf"
             fi
             info "  $(basename "$cf") → ${key}.locale=zh"
             break
