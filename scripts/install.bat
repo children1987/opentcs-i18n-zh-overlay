@@ -134,7 +134,7 @@ if !errorlevel! equ 0 (
 if not exist "!script!" exit /b
 
 REM Strategy 1: set CLASSPATH= definition (Gradle Application Plugin)
-findstr /r "^set CLASSPATH=" "!script!" >nul 2>&1
+findstr /c:"set CLASSPATH=" "!script!" >nul 2>&1
 if !errorlevel! equ 0 (
     set "tmpfile=!script!.tmp"
     set "inserted=0"
@@ -142,7 +142,7 @@ if !errorlevel! equ 0 (
         for /f "usebackq delims=" %%L in ("!script!") do (
             set "line=%%L"
             if "!inserted!"=="0" (
-                echo !line! | findstr /r "^set CLASSPATH=" >nul
+                echo !line! | findstr /c:"set CLASSPATH=" >nul
                 if !errorlevel! equ 0 (
                     echo REM === openTCS i18n-zh overlay ===
                     echo set CLASSPATH=%%APP_HOME%%\i18n-overlay;%%CLASSPATH%%
@@ -158,7 +158,7 @@ if !errorlevel! equ 0 (
 )
 
 REM Strategy 2: look for CLASSPATH or java command
-findstr /r "CLASSPATH\|classpath\|java\|javaw" "!script!" >nul 2>&1
+findstr /i /c:"classpath" /c:"java" "!script!" >nul 2>&1
 if !errorlevel! equ 0 (
     set "tmpfile=!script!.tmp"
     set "inserted=0"
@@ -166,7 +166,7 @@ if !errorlevel! equ 0 (
         for /f "usebackq delims=" %%L in ("!script!") do (
             set "line=%%L"
             if "!inserted!"=="0" (
-                echo !line! | findstr /r "set.*CLASSPATH\|CLASSPATH=" >nul
+                echo !line! | findstr /i /c:"classpath" >nul
                 if !errorlevel! equ 0 (
                     echo REM === openTCS i18n-zh overlay ===
                     echo set CLASSPATH=%%APP_HOME%%\i18n-overlay;%%CLASSPATH%%
@@ -198,13 +198,13 @@ set "prop_file=!app_dir!\config\!app_name!.properties"
 
 for %%F in ("!custom_file!" "!prop_file!") do (
     if exist %%F (
-        findstr /r "^!locale_key!\.locale=" %%F >nul 2>&1
+        findstr /c:"!locale_key!.locale=" %%F >nul 2>&1
         if !errorlevel! equ 0 (
             set "tmp=%%F.tmp"
             (
                 for /f "usebackq delims=" %%L in (%%F) do (
                     set "line=%%L"
-                    echo !line! | findstr /r "^!locale_key!\.locale=" >nul
+                    echo !line! | findstr /c:"!locale_key!.locale=" >nul
                     if !errorlevel! equ 0 (
                         echo !locale_key!.locale=zh
                     ) else (
