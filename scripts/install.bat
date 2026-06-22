@@ -144,7 +144,10 @@ REM Subroutine: patch Windows bat startup script
 REM openTCS 7.x bat format:
 REM   set OPENTCS_CP=%OPENTCS_LIBDIR%\*;
 REM   set OPENTCS_CP=%OPENTCS_CP%;...
-REM We prepend: set OPENTCS_CP=%OPENTCS_BASE%\i18n-overlay;
+REM We MODIFY the first line to prepend overlay BEFORE the lib dir:
+REM   set OPENTCS_CP=%OPENTCS_BASE%\i18n-overlay;%OPENTCS_LIBDIR%\*;
+REM (can't insert a new line because the next "set OPENTCS_CP="
+REM  without %OPENTCS_CP% reference would overwrite it)
 REM ========================================================
 :patch_bat
 set "script=%~1"
@@ -158,47 +161,23 @@ if !errorlevel! equ 0 (
     exit /b
 )
 
-REM Look for first "set OPENTCS_CP=" line and prepend our overlay
+REM Modify the first "set OPENTCS_CP=" line to prepend overlay
 findstr /c:"set OPENTCS_CP=" "!script!" >nul 2>&1
 if !errorlevel! equ 0 (
     set "tmpfile=!script!.tmp"
-    set "inserted=0"
+    set "done=0"
     (
         for /f "usebackq delims=" %%L in ("!script!") do (
             set "line=%%L"
-            if "!inserted!"=="0" (
+            if "!done!"=="0" (
                 echo !line! | findstr /c:"set OPENTCS_CP=" >nul
                 if !errorlevel! equ 0 (
-                    echo REM === openTCS i18n-zh overlay ===
-                    echo set OPENTCS_CP=%%OPENTCS_BASE%%\i18n-overlay;
-                    set "inserted=1"
+                    REM Prepend overlay to the first OPENTCS_CP line
+                    set "line=!line:%%OPENTCS_LIBDIR%%=%%OPENTCS_BASE%%\i18n-overlay;%%OPENTCS_LIBDIR%%!"
+                    set "done=1"
                 )
             )
-            echo %%L
-        )
-    ) > "!tmpfile!"
-    move /y "!tmpfile!" "!script!" >nul
-    echo     !name! - patched
-    exit /b
-)
-
-REM Fallback: look for CLASSPATH or classpath references
-findstr /i /c:"classpath" /c:"OPENTCS_CP" "!script!" >nul 2>&1
-if !errorlevel! equ 0 (
-    set "tmpfile=!script!.tmp"
-    set "inserted=0"
-    (
-        for /f "usebackq delims=" %%L in ("!script!") do (
-            set "line=%%L"
-            if "!inserted!"=="0" (
-                echo !line! | findstr /i /c:"OPENTCS_CP" /c:"classpath" >nul
-                if !errorlevel! equ 0 (
-                    echo REM === openTCS i18n-zh overlay ===
-                    echo set OPENTCS_CP=%%OPENTCS_BASE%%\i18n-overlay;%%OPENTCS_CP%%
-                    set "inserted=1"
-                )
-            )
-            echo %%L
+            echo !line!
         )
     ) > "!tmpfile!"
     move /y "!tmpfile!" "!script!" >nul

@@ -117,20 +117,11 @@ patch_script() {
     local patched=false
 
     # 策略1: OPENTCS_CP 变量 (openTCS 7.x 标准格式)
-    #   原始: set OPENTCS_CP=%OPENTCS_LIBDIR%\*;
-    #   补丁: set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;
+    #   不能插入新行，因为下一个 "set OPENTCS_CP=" 不引用 %OPENTCS_CP% 会覆盖
+    #   直接修改第一行：%OPENTCS_LIBDIR%\* → %OPENTCS_BASE%/i18n-overlay;%OPENTCS_LIBDIR%\*
     if grep -q 'OPENTCS_CP=' "$script" 2>/dev/null; then
-        sed -i '/^set OPENTCS_CP=%OPENTCS_LIBDIR%/{
-            i\# === openTCS i18n-zh overlay ===
-            i\set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;
-        }' "$script"
-        patched=true
-    fi
-
-    # 策略2: export OPENTCS_CP (旧版 .sh 脚本)
-    if ! $patched && grep -q 'OPENTCS_CP=' "$script" 2>/dev/null; then
-        sed -i '/^set OPENTCS_CP=.*OPENTCS_LIBDIR/{
-            i\set OPENTCS_CP="${OPENTCS_BASE}/i18n-overlay;"
+        sed -i '0,/set OPENTCS_CP=%OPENTCS_LIBDIR%/{
+            s|set OPENTCS_CP=%OPENTCS_LIBDIR%|set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;%OPENTCS_LIBDIR%|
         }' "$script"
         patched=true
     fi
