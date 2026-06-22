@@ -1,0 +1,21 @@
+# Build artifacts
+*.class
+*.jar
+*.war
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Backup dirs created by install script
+.i18n-zh-backup-*/
+
+# Temporary files
+*.swp
+*.swo
+*~
