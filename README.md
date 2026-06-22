@@ -55,18 +55,18 @@ scripts\install.bat C:\opentcs-7.3.0-bin
 
 **Linux / macOS：**
 ```bash
-opentcs-7.3.0-bin/opentcs-kernel/bin/startKernel
-opentcs-7.3.0-bin/opentcs-kernelcontrolcenter/bin/startKernelControlCenter
-opentcs-7.3.0-bin/opentcs-modeleditor/bin/startModelEditor
-opentcs-7.3.0-bin/opentcs-operationsdesk/bin/startOperationsDesk
+opentcs-7.3.0-bin/opentcs-kernel/startKernel.sh
+opentcs-7.3.0-bin/opentcs-kernelcontrolcenter/startKernelControlCenter.sh
+opentcs-7.3.0-bin/opentcs-modeleditor/startModelEditor.sh
+opentcs-7.3.0-bin/opentcs-operationsdesk/startOperationsDesk.sh
 ```
 
 **Windows：**
 ```cmd
-opentcs-7.3.0-bin\opentcs-kernel\bin\startKernel.bat
-opentcs-7.3.0-bin\opentcs-kernelcontrolcenter\bin\startKernelControlCenter.bat
-opentcs-7.3.0-bin\opentcs-modeleditor\bin\startModelEditor.bat
-opentcs-7.3.0-bin\opentcs-operationsdesk\bin\startOperationsDesk.bat
+opentcs-7.3.0-bin\opentcs-kernel\startKernel.bat
+opentcs-7.3.0-bin\opentcs-kernelcontrolcenter\startKernelControlCenter.bat
+opentcs-7.3.0-bin\opentcs-modeleditor\startModelEditor.bat
+opentcs-7.3.0-bin\opentcs-operationsdesk\startOperationsDesk.bat
 ```
 
 ### 卸载

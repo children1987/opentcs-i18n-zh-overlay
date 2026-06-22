@@ -72,18 +72,18 @@ jobs:
 
             ### Linux / macOS
             ```bash
-            opentcs-kernel/bin/startKernel
-            opentcs-kernelcontrolcenter/bin/startKernelControlCenter
-            opentcs-modeleditor/bin/startModelEditor
-            opentcs-operationsdesk/bin/startOperationsDesk
+            opentcs-kernel/startKernel.sh
+            opentcs-kernelcontrolcenter/startKernelControlCenter.sh
+            opentcs-modeleditor/startModelEditor.sh
+            opentcs-operationsdesk/startOperationsDesk.sh
             ```
 
             ### Windows
             ```cmd
-            opentcs-kernel\bin\startKernel.bat
-            opentcs-kernelcontrolcenter\bin\startKernelControlCenter.bat
-            opentcs-modeleditor\bin\startModelEditor.bat
-            opentcs-operationsdesk\bin\startOperationsDesk.bat
+            opentcs-kernel\startKernel.bat
+            opentcs-kernelcontrolcenter\startKernelControlCenter.bat
+            opentcs-modeleditor\startModelEditor.bat
+            opentcs-operationsdesk\startOperationsDesk.bat
             ```
 
             ## 卸载

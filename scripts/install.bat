@@ -186,6 +186,9 @@ exit /b
 
 REM ========================================================
 REM Subroutine: patch shell startup script (for WSL/Git Bash)
+REM
+REM Patches: export OPENTCS_CP="${OPENTCS_LIBDIR}/*"
+REM      ->  export OPENTCS_CP="${OPENTCS_BASE}/i18n-overlay:${OPENTCS_LIBDIR}/*"
 REM ========================================================
 :patch_sh
 set "script=%~1"
@@ -193,9 +196,12 @@ set "name=%~nx1"
 
 if not exist "!script!" exit /b
 
-grep -q "i18n-overlay" "!script!" 2>nul
+REM If file already touched, ask user to re-extract
+findstr /c:"i18n-overlay" "!script!" >nul 2>&1
 if !errorlevel! equ 0 (
-    echo     !name! - already patched
+    echo     !name! - WARNING: file was modified by a previous install
+    echo            Please re-extract the original from opentcs-7.3.0-bin.zip
+    echo            then re-run install.bat
     exit /b
 )
 
@@ -203,10 +209,8 @@ REM Check if sed is available (Git Bash / WSL)
 where sed >nul 2>&1
 if !errorlevel! neq 0 exit /b
 
-sed -i '/^set OPENTCS_CP=%OPENTCS_LIBDIR%/i\
-# === openTCS i18n-zh overlay ===\
-set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;\
-' "!script!" 2>nul
+REM Fresh patch: replace first export OPENTCS_CP line
+sed -i 's|export OPENTCS_CP="${OPENTCS_LIBDIR}/\*"|export OPENTCS_CP="${OPENTCS_BASE}/i18n-overlay:${OPENTCS_LIBDIR}/*"|' "!script!" 2>nul
 if !errorlevel! equ 0 (
     echo     !name! - patched
 ) else (

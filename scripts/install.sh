@@ -109,25 +109,30 @@ patch_script() {
     if ! echo "$name" | grep -qE '^(start|run)'; then
         return
     fi
-    # If file already touched, ask user to re-extract
+
+    # 如果文件已修改过，警告用户重新解压
     if grep -q 'i18n-overlay' "$script" 2>/dev/null; then
         warn "    $name — 文件已被之前的安装修改"
         warn "           请从 opentcs-7.3.0-bin.zip 重新解压原始文件，再运行 install.sh"
         return
     fi
 
-    local patched=false
-
-    # OPENTCS_CP 变量 (openTCS 7.x 标准格式)
-    # 修改第一行：%OPENTCS_LIBDIR%\* → %OPENTCS_BASE%/i18n-overlay;%OPENTCS_LIBDIR%\*
-    if grep -q 'OPENTCS_CP=' "$script" 2>/dev/null; then
-        sed -i '0,/set OPENTCS_CP=%OPENTCS_LIBDIR%/{
-            s|set OPENTCS_CP=%OPENTCS_LIBDIR%|set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;%OPENTCS_LIBDIR%|
-        }' "$script"
-        patched=true
+    # 判断脚本类型：shebang (#!/) → shell 脚本，否则 → batch 脚本
+    if head -1 "$script" 2>/dev/null | grep -q '^#!/'; then
+        # ─── Shell 脚本 (.sh) ───────────────────────────────
+        # 原始: export OPENTCS_CP="${OPENTCS_LIBDIR}/*"
+        # 修改为: export OPENTCS_CP="${OPENTCS_BASE}/i18n-overlay:${OPENTCS_LIBDIR}/*"
+        # 第二行 ${OPENTCS_CP}:... 不变，自动继承 overlay 路径
+        sed -i 's|export OPENTCS_CP="${OPENTCS_LIBDIR}/\*"|export OPENTCS_CP="${OPENTCS_BASE}/i18n-overlay:${OPENTCS_LIBDIR}/*"|' "$script"
+    else
+        # ─── Windows 批处理 (.bat) ─────────────────────────
+        # 原始: set OPENTCS_CP=%OPENTCS_LIBDIR%\*;
+        # 修改为: set OPENTCS_CP=%OPENTCS_BASE%\i18n-overlay;%OPENTCS_LIBDIR%\*;
+        # 第二行 %OPENTCS_CP%;... 不变，自动继承 overlay 路径
+        sed -i 's|set OPENTCS_CP=%OPENTCS_LIBDIR%\\\*;|set OPENTCS_CP=%OPENTCS_BASE%\\i18n-overlay;%OPENTCS_LIBDIR%\\*;|' "$script"
     fi
 
-    if $patched; then
+    if grep -q 'i18n-overlay' "$script" 2>/dev/null; then
         info "    $name ✓"
     else
         warn "    $name — 无法识别脚本格式，请手动将 i18n-overlay/ 加入 classpath"
