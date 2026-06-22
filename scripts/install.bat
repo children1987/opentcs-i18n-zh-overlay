@@ -172,12 +172,16 @@ if !errorlevel! equ 0 (
             if "!done!"=="0" (
                 echo !line! | findstr /c:"set OPENTCS_CP=" >nul
                 if !errorlevel! equ 0 (
-                    REM Prepend overlay to the first OPENTCS_CP line
-                    set "line=!line:%%OPENTCS_LIBDIR%%=%%OPENTCS_BASE%%\i18n-overlay;%%OPENTCS_LIBDIR%%!"
+                    REM Replace the first OPENTCS_CP line: prepend overlay path
+                    REM Output literal: set OPENTCS_CP=%OPENTCS_BASE%\i18n-overlay;%OPENTCS_LIBDIR%\*;
+                    echo set OPENTCS_CP=%%OPENTCS_BASE%%\i18n-overlay;%%OPENTCS_LIBDIR%%\*;
                     set "done=1"
+                ) else (
+                    echo !line!
                 )
+            ) else (
+                echo !line!
             )
-            echo !line!
         )
     ) > "!tmpfile!"
     move /y "!tmpfile!" "!script!" >nul
