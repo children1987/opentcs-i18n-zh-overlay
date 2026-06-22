@@ -109,28 +109,17 @@ patch_script() {
     if ! echo "$name" | grep -qE '^(start|run)'; then
         return
     fi
-    # Check for CORRECT existing patch (overlay+LIBDIR on same line)
-    if grep -q 'OPENTCS_BASE.*i18n-overlay.*OPENTCS_LIBDIR' "$script" 2>/dev/null; then
-        info "    $name — 已打过补丁，跳过"
-        return
-    fi
-
-    # Check for BAD old patch (separate overlay-only line)
+    # If file already touched, ask user to re-extract
     if grep -q 'i18n-overlay' "$script" 2>/dev/null; then
-        warn "    $name — 修复旧版损坏补丁..."
-        # Remove the bad standalone overlay line, merge into first OPENTCS_CP+LIBDIR
-        sed -i '/set OPENTCS_CP=.*i18n-overlay;/{ /OPENTCS_LIBDIR/!d; }' "$script"
-        sed -i '0,/set OPENTCS_CP=%OPENTCS_LIBDIR%/{
-            s|set OPENTCS_CP=%OPENTCS_LIBDIR%|set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;%OPENTCS_LIBDIR%|
-        }' "$script"
-        info "    $name ✓ (已修复)"
+        warn "    $name — 文件已被之前的安装修改"
+        warn "           请从 opentcs-7.3.0-bin.zip 重新解压原始文件，再运行 install.sh"
         return
     fi
 
     local patched=false
 
-    # Fresh patch: OPENTCS_CP 变量 (openTCS 7.x 标准格式)
-    #   不能插入新行，直接修改第一行注入 overlay
+    # OPENTCS_CP 变量 (openTCS 7.x 标准格式)
+    # 修改第一行：%OPENTCS_LIBDIR%\* → %OPENTCS_BASE%/i18n-overlay;%OPENTCS_LIBDIR%\*
     if grep -q 'OPENTCS_CP=' "$script" 2>/dev/null; then
         sed -i '0,/set OPENTCS_CP=%OPENTCS_LIBDIR%/{
             s|set OPENTCS_CP=%OPENTCS_LIBDIR%|set OPENTCS_CP=%OPENTCS_BASE%/i18n-overlay;%OPENTCS_LIBDIR%|
