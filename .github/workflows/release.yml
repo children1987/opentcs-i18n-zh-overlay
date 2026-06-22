@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create release tarball
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          ARCHIVE="opentcs-i18n-zh-overlay-${VERSION}.tar.gz"
+          tar -czf "$ARCHIVE" i18n-overlay/ scripts/ README.md
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_OUTPUT"
+          echo "Created $ARCHIVE ($(du -h "$ARCHIVE" | cut -f1))"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "v${{ steps.version.outputs.VERSION }} — openTCS ${{ steps.version.outputs.VERSION }} 中文语言包"
+          body: |
+            ## 安装
+
+            1. 下载 `opentcs-i18n-zh-overlay-${{ steps.version.outputs.VERSION }}.tar.gz`
+            2. `tar xzf opentcs-i18n-zh-overlay-${{ steps.version.outputs.VERSION }}.tar.gz`
+            3. `cd opentcs-i18n-zh-overlay && ./scripts/install.sh <opentcs-${{ steps.version.outputs.VERSION }}-bin目录>`
+
+            ## 内容
+
+            - 44 个中文翻译文件（CC BY 4.0）
+            - 一键安装/卸载脚本
+            - ~22KB，无需编译，无依赖
+          files: "${{ steps.version.outputs.ARCHIVE }}"
+          draft: false
+          prerelease: false
