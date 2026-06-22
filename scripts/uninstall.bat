@@ -1,32 +1,33 @@
 @echo off
-REM uninstall.bat — 恢复 openTCS 到安装中文语言包之前的状态 (Windows)
+chcp 65001 >nul 2>&1
+REM uninstall.bat - restore openTCS to pre-i18n-zh state (Windows)
 setlocal enabledelayedexpansion
 
 if "%~1"=="" (
-    echo 用法: %~nx0 ^<opentcs-7.3.0-bin目录^>
+    echo Usage: %~nx0 ^<opentcs-7.3.0-bin-dir^>
     exit /b 1
 )
 
 set "OTCS_ROOT=%~f1"
 if not exist "!OTCS_ROOT!\" (
-    echo [ERROR] 目录不存在: !OTCS_ROOT!
+    echo [ERROR] Directory not found: !OTCS_ROOT!
     exit /b 1
 )
 
-REM 查找最新备份
+REM Find latest backup
 set "BACKUP="
 for /f "delims=" %%D in ('dir /b /ad /o-n "!OTCS_ROOT!\.i18n-zh-backup-*" 2^>nul') do (
     if not defined BACKUP set "BACKUP=%%D"
 )
 
 if not defined BACKUP (
-    echo [ERROR] 未找到备份目录 ^(.i18n-zh-backup-*^)
-    echo 请手动移除各子应用中的 i18n-overlay\ 并还原启动脚本
+    echo [ERROR] No backup found (.i18n-zh-backup-*)
+    echo Please remove i18n-overlay\ manually and restore startup scripts
     exit /b 1
 )
 
 set "BACKUP_DIR=!OTCS_ROOT!\!BACKUP!"
-echo [INFO] 使用备份: !BACKUP!
+echo [INFO] Using backup: !BACKUP!
 
 set APPS=opentcs-kernel opentcs-kernelcontrolcenter opentcs-modeleditor opentcs-operationsdesk
 
@@ -34,24 +35,24 @@ for %%A in (%APPS%) do (
     set "app_dir=!OTCS_ROOT!\%%A"
     if exist "!app_dir!\" (
 
-        REM 恢复启动脚本
+        REM Restore startup scripts
         if exist "!BACKUP_DIR!\%%A\bin\" (
             xcopy /e /q /y "!BACKUP_DIR!\%%A\bin\*" "!app_dir!\bin\" >nul 2>&1
-            echo [INFO] 恢复: %%A\bin\
+            echo [INFO] Restored: %%A\bin\
         )
 
-        REM 恢复配置
+        REM Restore config
         if exist "!BACKUP_DIR!\%%A\config\" (
             xcopy /e /q /y "!BACKUP_DIR!\%%A\config\*" "!app_dir!\config\" >nul 2>&1
-            echo [INFO] 恢复: %%A\config\
+            echo [INFO] Restored: %%A\config\
         )
 
-        REM 移除 overlay
+        REM Remove overlay
         if exist "!app_dir!\i18n-overlay\" (
             rmdir /s /q "!app_dir!\i18n-overlay"
-            echo [INFO] 移除: %%A\i18n-overlay\
+            echo [INFO] Removed: %%A\i18n-overlay\
         )
     )
 )
 
-echo [INFO] 恢复完成！备份保留在: !BACKUP_DIR!
+echo [INFO] Uninstall complete. Backup kept at: !BACKUP_DIR!
