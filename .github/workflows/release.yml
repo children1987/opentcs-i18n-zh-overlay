@@ -32,17 +32,58 @@ jobs:
         with:
           name: "v${{ steps.version.outputs.VERSION }} — openTCS ${{ steps.version.outputs.VERSION }} 中文语言包"
           body: |
+            ## 前置条件
+
+            从 [openTCS 官方](https://www.opentcs.org/en/download.html) 下载 `opentcs-${{ steps.version.outputs.VERSION }}-bin.zip` 并解压。
+
             ## 安装
 
-            1. 下载 `opentcs-i18n-zh-overlay-${{ steps.version.outputs.VERSION }}.tar.gz`
-            2. `tar xzf opentcs-i18n-zh-overlay-${{ steps.version.outputs.VERSION }}.tar.gz`
-            3. `cd opentcs-i18n-zh-overlay && ./scripts/install.sh <opentcs-${{ steps.version.outputs.VERSION }}-bin目录>`
+            ### Linux / macOS
+
+            ```bash
+            tar xzf opentcs-i18n-zh-overlay-${{ steps.version.outputs.VERSION }}.tar.gz
+            cd opentcs-i18n-zh-overlay
+            ./scripts/install.sh /path/to/opentcs-${{ steps.version.outputs.VERSION }}-bin
+            ```
+
+            ### Windows
+
+            ```cmd
+            tar xzf opentcs-i18n-zh-overlay-${{ steps.version.outputs.VERSION }}.tar.gz
+            cd opentcs-i18n-zh-overlay
+            scripts\install.bat C:\opentcs-${{ steps.version.outputs.VERSION }}-bin
+            ```
+
+            ## 启动
+
+            ### Linux / macOS
+            ```bash
+            opentcs-kernel/bin/startKernel
+            opentcs-kernelcontrolcenter/bin/startKernelControlCenter
+            opentcs-modeleditor/bin/startModelEditor
+            opentcs-operationsdesk/bin/startOperationsDesk
+            ```
+
+            ### Windows
+            ```cmd
+            opentcs-kernel\bin\startKernel.bat
+            opentcs-kernelcontrolcenter\bin\startKernelControlCenter.bat
+            opentcs-modeleditor\bin\startModelEditor.bat
+            opentcs-operationsdesk\bin\startOperationsDesk.bat
+            ```
+
+            ## 卸载
+
+            | 平台 | 命令 |
+            |------|------|
+            | Linux / macOS | `./scripts/uninstall.sh <opentcs目录>` |
+            | Windows | `scripts\uninstall.bat <opentcs目录>` |
 
             ## 内容
 
             - 44 个中文翻译文件（CC BY 4.0）
-            - 一键安装/卸载脚本
-            - ~22KB，无需编译，无依赖
+            - 一键安装/卸载脚本（Linux + Windows）
+            - ~24KB，无需编译，无依赖
           files: "${{ steps.archive.outputs.ARCHIVE }}"
           draft: false
           prerelease: false
