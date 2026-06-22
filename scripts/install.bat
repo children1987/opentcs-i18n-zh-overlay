@@ -248,7 +248,7 @@ for %%F in ("!custom_file!" "!prop_file!") do (
             ) > "!tmp!"
             move /y "!tmp!" %%F >nul
         ) else (
-            echo !locale_key!.locale=zh >> %%F
+            (echo !locale_key!.locale=zh) >> %%F
         )
         echo   %%~nxF -^> !locale_key!.locale=zh
         exit /b
